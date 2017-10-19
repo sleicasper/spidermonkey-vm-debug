@@ -32,6 +32,7 @@ define dis
 	set $codelength = 0
 	set $count = $arg1
 	set $i = 0
+	python print("%-25s %-8s %-10s %17s"%('bytecodename', 'argv', 'bytecode', 'othermsg'))
 	while $i != $count
 		set $bytecode = *($ptr)
 		set $bytecodearg = *((uint32_t*)($ptr+1))
@@ -72,7 +73,7 @@ end
 
 disvm = '''
 define disvm
-	dis activation.regs_.pc 12
+	dis activation.regs_.pc-10 20
 end'''
 
 fscript.write(bytecodehead)
@@ -80,7 +81,8 @@ for elem in BYTECODES:
 	SF = '''
 		elif bytecode == %s:
 			codetmp = shiftendian(%s & %s)
-			print("%%-25s %%-8x %%02x"%%("%s", codetmp, %s))
+			othermsg = str(gdb.execute("getjsname %%d"%%codetmp, to_string = True)).strip()
+			print("%%-25s %%-8x %%02x %%25s"%%("%s", codetmp, %s, othermsg))
 			gdb.execute('set $codelength = %s')'''
 	if elem[2] == '1':
 		mask = 0
