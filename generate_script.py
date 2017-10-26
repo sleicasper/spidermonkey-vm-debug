@@ -73,7 +73,16 @@ end
 
 disvm = '''
 define disvm
-	dis activation.regs_.pc-10 20
+	if $argc == 0
+		dis activation.regs_.pc 10
+	end
+	if $argc == 1
+		dis activation.regs_.pc $arg0
+	end
+	if $argc == 2
+		dis activation.regs_.pc$arg0 $arg1
+	end
+	
 end'''
 
 fscript.write(bytecodehead)
