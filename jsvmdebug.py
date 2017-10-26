@@ -103,7 +103,7 @@ class Pbytecode(gdb.Command):
 			0x6c:{'name':'JSOP_FUNCALL', 'codelen':'3', 'isstring':'1'},
 			0x34:{'name':'JSOP_FUNWITHPROTO', 'codelen':'5', 'isstring':'1'},
 			0x02:{'name':'JSOP_GETRVAL', 'codelen':'1', 'isstring':'1'},
-			0x82:{'name':'JSOP_LAMBDA', 'codelen':'5', 'isstring':'1'},
+			0x82:{'name':'JSOP_LAMBDA', 'codelen':'5', 'isstring':'0'},
 			0x83:{'name':'JSOP_LAMBDA_ARROW', 'codelen':'5', 'isstring':'1'},
 			0x52:{'name':'JSOP_NEW', 'codelen':'3', 'isstring':'1'},
 			0xb2:{'name':'JSOP_OPTIMIZE_SPREADCALL', 'codelen':'1', 'isstring':'1'},
@@ -301,7 +301,7 @@ class Pbytecode(gdb.Command):
 				print('error')
 				exit(0)
 			bytecodearg = bytecodearg & mask
-			if codeinfo['isstring'] == '1':
+			if codeinfo['isstring'] == '1' and codelen != '1':
 				othermsg = str(gdb.execute("getjsname %d"%bytecodearg, to_string = True)).strip()
 			else:
 				othermsg = ''
