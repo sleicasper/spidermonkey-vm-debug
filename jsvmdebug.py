@@ -4,7 +4,7 @@ import traceback
 class Pasciistr(gdb.Command):
 	def __init__(self):
 		super(self.__class__, self).__init__("pasciistr", gdb.COMMAND_USER)
-		self.char_PN = re.compile(r'\'([\w\\]+)\'')
+		self.char_PN = re.compile(r'\'([\w \\]+)\'')
 		self.decimal_PN = re.compile(r'^[0-9]+$')
 	def invoke(self, args, from_tty):
 		try:
@@ -30,7 +30,7 @@ class Pasciistr(gdb.Command):
 					ch = self.char_PN.findall(resstr)[0]
 					result += ch
 				else:
-					print("re find error")
+					print("re find error, restr: " + resstr)
 					return
 				ptr += 1
 			print(result)
@@ -59,7 +59,7 @@ class Getjsname(gdb.Command):
 				length = re.compile(r'^\$[0-9]+ = ([0-9]+)$').findall(length)[0]
 				gdb.execute("pasciistr &(*(script->getAtom(%d).value)).d.inlineStorageLatin1 %s"%(idx, length))
 			else:
-				print("re find error")
+				print("re find error; re result length: " + length)
 				return
 		except:
                         traceback.print_exc()
