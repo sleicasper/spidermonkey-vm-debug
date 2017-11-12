@@ -31,7 +31,7 @@ define dis
 	set $codelength = 0
 	set $count = $arg1
 	set $i = 0
-	python print("%-16s %-25s %-10s %02s %04s%-25s"%('address', 'bytecodename', 'argv', 'bytecode', '', 'othermsg'))
+	python print("%03s %-16s %-25s %-10s %02s %04s%-25s"%('', 'address', 'bytecodename', 'argv', 'bytecode', '', 'othermsg'))
 	while $i != $count
 		set $bytecodeptr = $ptr
 		set $bytecode = *($ptr)
@@ -43,22 +43,7 @@ define dis
 end
 '''
 
-disvm = '''
-define disvm
-	if $argc == 0
-		dis activation.regs_.pc 10
-	end
-	if $argc == 1
-		dis activation.regs_.pc $arg0
-	end
-	if $argc == 2
-		dis activation.regs_.pc$arg0 $arg1
-	end
-	
-end'''
-
 fscript.write(dis)
-fscript.write(disvm)
 
 getname = '''
 define getname

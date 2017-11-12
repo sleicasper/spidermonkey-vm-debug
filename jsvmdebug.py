@@ -294,6 +294,11 @@ class Pbytecode(gdb.Command):
 				bytecodearg= gdb.parse_and_eval("$bytecodearg")
 				bytecodearg = shiftendian(int(bytecodearg))
 				codelen = codeinfo['codelen']
+				pcptr = self.hex_PN.findall( str(gdb.parse_and_eval("activation.regs_.pc")) )[0]
+				if int(pcptr, 16) == int(bytecodeptr, 16):
+					premsg = "->"
+				else:
+					premsg = ""
 
 				if codelen == '1':
 					mask = 0
@@ -313,7 +318,7 @@ class Pbytecode(gdb.Command):
 					othermsg = str(gdb.execute("getjsname %d"%bytecodearg, to_string = True)).strip()
 				else:
 					othermsg = ''
-				print("%-16s %-25s 0x%-8x %02x %010s%-25s"%(bytecodeptr, codeinfo['name'], bytecodearg, bytecode, "", othermsg))
+				print("%03s %-16s %-25s 0x%-8x %02x %010s%-25s"%(premsg, bytecodeptr, codeinfo['name'], bytecodearg, bytecode, "", othermsg))
 				gdb.execute('set $codelength = %s'%(codelen))
 			else:
 				print("bytecode: %02x"%bytecode)
@@ -321,7 +326,27 @@ class Pbytecode(gdb.Command):
 				exit(0)
 			return
 		except:
-                        traceback.print_exc()
+			traceback.print_exc()
+ 
+
+class Disvm(gdb.Command):
+	def __init__(self):
+		super(self.__class__, self).__init__("disvm", gdb.COMMAND_USER)
+	def invoke(self, args, from_tty):
+		try:
+			argv = gdb.string_to_argv(args)
+			if len(argv) == 0:
+				gdb.execute("dis activation.regs_.pc 10")
+			elif len(argv) == 1:
+				if int(argv[0]) < 0:
+					gdb.execute("dis activation.regs_.pc%s 10"%argv[0])
+				else:
+					gdb.execute("dis activation.regs_.pc %s"%argv[0])
+			else:
+				gdb.execute("dis activation.regs_.pc%s %s"%(argv[0], argv[1]))
+		except:
+                        traceback.print_exc()                       
 Pasciistr()
 Getjsname()
 Pbytecode()
+Disvm()
