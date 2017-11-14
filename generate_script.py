@@ -32,7 +32,8 @@ define dis
 	set $count = $arg1
 	set $i = 0
 	python print("%03s %-16s %-25s %-10s %02s %04s%-25s"%('', 'address', 'bytecodename', 'argv', 'bytecode', '', 'othermsg'))
-	while $i != $count
+	set $bytecode = *($ptr)
+	while $i != $count and $bytecode != 153
 		set $bytecodeptr = $ptr
 		set $bytecode = *($ptr)
 		set $bytecodearg = *((uint32_t*)($ptr+1))
