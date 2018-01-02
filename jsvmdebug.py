@@ -1,6 +1,64 @@
 import gdb,re
 import traceback
 
+
+classname_addr_PN = re.compile(r"\(([a-zA-Z0-9<>()*:, ]+)\s*\*\s*\)\s*(0x[0-9a-f]*)")
+g_hexaddr_PN = re.compile(r"(0x[0-9a-fA-F]+)")
+RTTIclassname_addr_PN = re.compile(r"\(([a-zA-Z0-9<>()*:$_,' ]+)\s*\*\s*\)\s*(0x[0-9a-f]*)")
+RTTIwarningclass_PN = re.compile(r"warning: RTTI symbol not found for class '.+'warning: RTTI symbol not found for class ('[^']+'nsIRunnable)")
+g_num_ptn = re.compile(r"=\s*([\d]+)")
+
+def GetNum(aStr):
+        res = g_num_ptn.findall(aStr)
+        assert( len(res) == 1 )
+        return int(res[0])
+
+def formstr(aList):
+        resstr = ''
+        for item in aList:
+                item = int(item, 16)
+                ch = chr( item )
+                if ch in printable:
+                        resstr += ch
+                elif ch == '"':
+                        resstr += '\\"'
+                elif ch == '\\':
+                        resstr += '\\\\'
+                elif ch == '\n':
+                        resstr += '\\n'
+                elif ch == '\r':
+                        resstr += '\\r'
+                elif ch == '\t':
+                        resstr += '\\t'
+                else:
+                        resstr += '\\x%02x'%(item)
+        return resstr
+
+def GetClassAndAddr(aStr):
+        aStr = aStr.replace('\n', '')
+        res = classname_addr_PN.findall( aStr )
+        if len(res) == 1:
+                return (res[0][0], res[0][1])
+        else:
+                res = RTTIclassname_addr_PN.findall(aStr)
+                assert( len(res) == 1 )
+                taddr = res[0][1]
+                res = RTTIwarningclass_PN.findall( res[0][0].strip(' ') )
+                assert( len(res) == 1 )
+                return (res[0], taddr)
+
+def GetText(aLength, aAddr):
+	if aLength >= 20:
+		tlength = 20
+	else:
+		tlength = aLength
+	fmt = "x/%dcx %s"%(tlength, aAddr)
+	data = gdb.execute(fmt, to_string = True)
+	charres = g_charhex_PN.findall(data)
+	othermsg = '"' + formstr(charres) + '"'
+	return othermsg
+
+
 class Pasciistr(gdb.Command):
 	def __init__(self):
 		super(self.__class__, self).__init__("pasciistr", gdb.COMMAND_USER)
@@ -38,31 +96,6 @@ class Pasciistr(gdb.Command):
                         traceback.print_exc()
 
 
-class Getjsname(gdb.Command):
-	def __init__(self):
-		super(self.__class__, self).__init__("getjsname", gdb.COMMAND_USER)
-	def invoke(self, args, from_tty):
-		try:
-			argv = gdb.string_to_argv(args)
-			if len(argv) != 1:
-				print("argv error")
-				return
-
-			maxidx = int( str(gdb.parse_and_eval("(script.ptr).natoms_")) )
-			idx = abs(int(argv[0]))
-			if idx >= maxidx:
-				print("idx too big")
-				return
-			length = gdb.execute("p (*(script->getAtom(%d).value)).d.u1.length"%idx, to_string=True)
-			length = str(length)
-			if len(re.compile(r'^\$[0-9]+ = ([0-9]+)$').findall(length)) == 1:
-				length = re.compile(r'^\$[0-9]+ = ([0-9]+)$').findall(length)[0]
-				gdb.execute("pasciistr &(*(script->getAtom(%d).value)).d.inlineStorageLatin1 %s"%(idx, length))
-			else:
-				print("re find error; re result length: " + length)
-				return
-		except:
-                        traceback.print_exc()
 
 def shiftendian(aNum):
     result = 0
@@ -300,6 +333,27 @@ class Pbytecode(gdb.Command):
 			0xe6:{'name':'JSOP_JUMPTARGET', 'codelen':'1', 'isstring':'1'},
 			0xe7:{'name':'JSOP_CALL_IGNORES_RV', 'codelen':'3', 'isstring':'0'}
 			}
+	def getgname(self, aIdx):
+		try:
+			maxidx = int( str(gdb.parse_and_eval("script.ptr->scriptData_->natoms_")) )
+			idx = abs(int(aIdx))
+			if idx >= maxidx:
+				print("idx too big")
+				return
+			tPtr = gdb.execute("p ((GCPtrAtom*)script.ptr->scriptData_.data_)[%d].value"%idx, to_string=True)
+			res = GetClassAndAddr(tPtr)
+			tclassname = res[0]
+			taddr = res[1]
+			tcmd = "p ((%s*)%s)->d.u1.length"%(tclassname, taddr)
+			tlength = gdb.execute(tcmd, to_string=True)
+			tlength = GetNum(tlength)
+			tcmd = "p &(((%s*)%s)->d.inlineStorageLatin1)"%(tclassname, taddr)
+			taddr = gdb.execute(tcmd, to_string=True)
+			taddr = g_hexaddr_PN.findall(taddr)[0]
+			resstr = GetText(tlength, taddr)
+			return resstr
+		except:
+                        traceback.print_exc()
 	def invoke(self, args, from_tty):
 		try:
 			argv = gdb.string_to_argv(args)
@@ -333,10 +387,10 @@ class Pbytecode(gdb.Command):
 					exit(0)
 				bytecodearg = bytecodearg & mask
 				if codeinfo['isstring'] == '1' and codelen != '1':
-					othermsg = str(gdb.execute("getjsname %d"%bytecodearg, to_string = True)).strip()
+					othermsg = self.getgname(bytecodearg)
 				else:
 					othermsg = ''
-				print("%03s %-16s %-25s 0x%-8x %02x %010s%-25s"%(premsg, bytecodeptr, codeinfo['name'], bytecodearg, bytecode, "", othermsg))
+				print("%3s %-16s %-25s 0x%-8x %02x %010s%-25s"%(premsg, bytecodeptr, codeinfo['name'], bytecodearg, bytecode, "", othermsg))
 				gdb.execute('set $codelength = %s'%(codelen))
 			else:
 				print("bytecode: %02x"%bytecode)
@@ -365,6 +419,5 @@ class Disvm(gdb.Command):
 		except:
                         traceback.print_exc()                       
 Pasciistr()
-Getjsname()
 Pbytecode()
 Disvm()
