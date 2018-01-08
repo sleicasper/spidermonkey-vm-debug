@@ -347,10 +347,11 @@ class Pbytecode(gdb.Command):
 			tcmd = "p ((%s*)%s)->d.u1.length"%(tclassname, taddr)
 			tlength = gdb.execute(tcmd, to_string=True)
 			tlength = GetNum(tlength)
+			resstr = "length: %3d "%tlength
 			tcmd = "p &(((%s*)%s)->d.inlineStorageLatin1)"%(tclassname, taddr)
 			taddr = gdb.execute(tcmd, to_string=True)
 			taddr = g_hexaddr_PN.findall(taddr)[0]
-			resstr = GetText(tlength, taddr)
+			resstr += "content: %s "%GetText(tlength, taddr)
 			return resstr
 		except:
                         traceback.print_exc()
