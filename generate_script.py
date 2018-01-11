@@ -24,27 +24,6 @@ with open("src/vm/Interpreter.cpp") as f:
 		lineno += 1
 fscript.write("end\n")
 
-dis = '''
-define dis
-	echo start disassembly\\n
-	set $ptr = (uint8_t*)$arg0
-	set $codelength = 0
-	set $count = $arg1
-	set $i = 0
-	python print("%03s %-16s %-25s %-10s %02s %04s%-25s"%('', 'address', 'bytecodename', 'argv', 'bytecode', '', 'othermsg'))
-	set $bytecode = *($ptr)
-	while $i != $count and $bytecode != 153
-		set $bytecodeptr = $ptr
-		set $bytecode = *($ptr)
-		set $bytecodearg = *((uint32_t*)($ptr+1))
-		pbytecode
-		set $ptr = $ptr + $codelength
-		set $i = $i + 1
-	end
-end
-'''
-
-fscript.write(dis)
 
 getname = '''
 define getname

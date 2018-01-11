@@ -52,7 +52,7 @@ def GetText(aLength, aAddr):
 		tlength = 20
 	else:
 		tlength = aLength
-	fmt = "x/%dcx %s"%(tlength, aAddr)
+	fmt = "x/%dbx %s"%(tlength, aAddr)
 	data = gdb.execute(fmt, to_string = True)
 	charres = g_charhex_PN.findall(data)
 	othermsg = '"' + formstr(charres) + '"'
@@ -60,8 +60,8 @@ def GetText(aLength, aAddr):
 
 
 class Pasciistr(gdb.Command):
-	def __init__(self):
-		super(self.__class__, self).__init__("pasciistr", gdb.COMMAND_USER)
+	def __init__(self, aCmdName):
+		super(self.__class__, self).__init__(aCmdName, gdb.COMMAND_USER)
 		self.char_PN = re.compile(r'\'([\w \\]+)\'')
 		self.decimal_PN = re.compile(r'^[0-9]+$')
 	def invoke(self, args, from_tty):
@@ -97,15 +97,9 @@ class Pasciistr(gdb.Command):
 
 
 
-def shiftendian(aNum):
-    result = 0
-    while aNum:
-            result = (result << 8) | (aNum&0xff)
-            aNum = aNum >> 8
-    return result
-class Pbytecode(gdb.Command):
-	def __init__(self):
-		super(self.__class__, self).__init__("pbytecode", gdb.COMMAND_USER)
+class Disvm(gdb.Command):
+	def __init__(self, aCmdName):
+		super(self.__class__, self).__init__(aCmdName, gdb.COMMAND_USER)
 		self.hex_PN = re.compile(r'(0x[0-9a-fA-F]+)')
 		self._BYTECODES = {
 			0x00:{'name':'JSOP_NOP', 'codelen':'1', 'isstring':'1'},
@@ -152,7 +146,7 @@ class Pbytecode(gdb.Command):
 			0x29:{'name':'JSOP_SPREADCALL', 'codelen':'1', 'isstring':'1'},
 			0x2a:{'name':'JSOP_SPREADNEW', 'codelen':'1', 'isstring':'1'},
 			0x2b:{'name':'JSOP_SPREADEVAL', 'codelen':'1', 'isstring':'1'},
-			0x2c:{'name':'JSOP_DUPAT', 'codelen':'4', 'isstring':'1'},
+			0x2c:{'name':'JSOP_DUPAT', 'codelen':'4', 'isstring':'0'},
 			0x2d:{'name':'JSOP_SYMBOL', 'codelen':'2', 'isstring':'1'},
 			0x2e:{'name':'JSOP_STRICTDELPROP', 'codelen':'5', 'isstring':'1'},
 			0x2f:{'name':'JSOP_STRICTDELELEM', 'codelen':'1', 'isstring':'1'},
@@ -189,7 +183,7 @@ class Pbytecode(gdb.Command):
 			0x4f:{'name':'JSOP_FUNAPPLY', 'codelen':'3', 'isstring':'1'},
 			0x50:{'name':'JSOP_OBJECT', 'codelen':'5', 'isstring':'1'},
 			0x51:{'name':'JSOP_POP', 'codelen':'1', 'isstring':'1'},
-			0x52:{'name':'JSOP_NEW', 'codelen':'3', 'isstring':'1'},
+			0x52:{'name':'JSOP_NEW', 'codelen':'3', 'isstring':'0'},
 			0x53:{'name':'JSOP_OBJWITHPROTO', 'codelen':'1', 'isstring':'1'},
 			0x54:{'name':'JSOP_GETARG', 'codelen':'3', 'isstring':'1'},
 			0x55:{'name':'JSOP_SETARG', 'codelen':'3', 'isstring':'1'},
@@ -197,7 +191,7 @@ class Pbytecode(gdb.Command):
 			0x57:{'name':'JSOP_SETLOCAL', 'codelen':'4', 'isstring':'1'},
 			0x58:{'name':'JSOP_UINT16', 'codelen':'3', 'isstring':'1'},
 			0x59:{'name':'JSOP_NEWINIT', 'codelen':'5', 'isstring':'1'},
-			0x5a:{'name':'JSOP_NEWARRAY', 'codelen':'5', 'isstring':'1'},
+			0x5a:{'name':'JSOP_NEWARRAY', 'codelen':'5', 'isstring':'0'},
 			0x5b:{'name':'JSOP_NEWOBJECT', 'codelen':'5', 'isstring':'1'},
 			0x5c:{'name':'JSOP_INITHOMEOBJECT', 'codelen':'2', 'isstring':'1'},
 			0x5d:{'name':'JSOP_INITPROP', 'codelen':'5', 'isstring':'1'},
@@ -333,6 +327,7 @@ class Pbytecode(gdb.Command):
 			0xe6:{'name':'JSOP_JUMPTARGET', 'codelen':'1', 'isstring':'1'},
 			0xe7:{'name':'JSOP_CALL_IGNORES_RV', 'codelen':'3', 'isstring':'0'}
 			}
+
 	def getgname(self, aIdx):
 		try:
 			maxidx = int( str(gdb.parse_and_eval("script.ptr->scriptData_->natoms_")) )
@@ -355,70 +350,89 @@ class Pbytecode(gdb.Command):
 			return resstr
 		except:
                         traceback.print_exc()
-	def invoke(self, args, from_tty):
-		try:
-			argv = gdb.string_to_argv(args)
-			bytecode = gdb.parse_and_eval("$bytecode")
-			bytecode = int(bytecode)
-			if bytecode in self._BYTECODES:
-				codeinfo = self._BYTECODES[bytecode]
-				bytecodeptr = gdb.parse_and_eval("$bytecodeptr")
-				bytecodeptr = self.hex_PN.findall(str(bytecodeptr))[0]
-				bytecodearg= gdb.parse_and_eval("$bytecodearg")
-				bytecodearg = shiftendian(int(bytecodearg))
-				codelen = codeinfo['codelen']
-				pcptr = self.hex_PN.findall( str(gdb.parse_and_eval("activation.regs_.pc")) )[0]
-				if int(pcptr, 16) == int(bytecodeptr, 16):
-					premsg = "->"
-				else:
-					premsg = ""
 
-				if codelen == '1':
-					mask = 0
-				elif codelen == '2':
-					mask = 0xff
-				elif codelen == '3':
-					mask = 0xffff
-				elif  codelen == '4':
-					mask = 0xffffff
-				elif  codelen == '5':
-					mask = 0xffffffff
-				else:
-					print('error')
-					exit(0)
-				bytecodearg = bytecodearg & mask
-				if codeinfo['isstring'] == '1' and codelen != '1':
-					othermsg = self.getgname(bytecodearg)
-				else:
-					othermsg = ''
-				print("%3s %-16s %-25s 0x%-8x %02x %010s%-25s"%(premsg, bytecodeptr, codeinfo['name'], bytecodearg, bytecode, "", othermsg))
-				gdb.execute('set $codelength = %s'%(codelen))
+	def realdisvm(self, aPc, aCount):
+		print("start disassembly")
+		print("%03s %-16s %-25s %-10s %02s %04s%-25s"%('', 'address', 'bytecodename', 'argv', 'bytecode', '', 'othermsg'))
+		currpc = int(self.hex_PN.findall( str(gdb.parse_and_eval("activation.regs_.pc")) )[0], 16)
+		pcptr = aPc
+		idx = 0
+		while True:
+			tres = gdb.execute("p *(uint8_t*)0x%x"%pcptr, to_string = True)
+			bytecode = GetNum(tres)
+			codeinfo = self._BYTECODES[bytecode]
+			codelen = codeinfo['codelen']
+
+			tres = gdb.execute("p *((uint32_t*)(0x%x+1))"%pcptr, to_string = True)
+			bytecodearg = GetNum(tres)
+			if pcptr == currpc:
+				premsg = "->"
 			else:
-				print("bytecode: %02x"%bytecode)
-				print("wrong bytecode")
+				premsg = ""
+
+			if codelen == '1':
+				mask = 0
+				bytecodearg = 0
+			elif codelen == '2':
+				bytecodearg = bytecodearg & 0xff
+			elif codelen == '3':
+				byte0 = (((bytecodearg>>8) & 0xff)<<0)
+				byte1 = (((bytecodearg>>0) & 0xff)<<8)
+				bytecodearg = byte0 | byte1
+			elif  codelen == '4':
+				byte0 = (((bytecodearg>>16) & 0xff)<<0)
+				byte1 = (((bytecodearg>>8) & 0xff)<<8)
+				byte2 = (((bytecodearg>>0) & 0xff)<<16)
+				bytecodearg = byte0 | byte1 | byte2
+			elif  codelen == '5':
+				byte0 = (((bytecodearg>>24) & 0xff)<<0)
+				byte1 = (((bytecodearg>>16) & 0xff)<<8)
+				byte2 = (((bytecodearg>>8) & 0xff)<<16)
+				byte3 = (((bytecodearg>>0) & 0xff)<<24)
+				bytecodearg = byte0 | byte1 | byte2 | byte3
+			else:
+				print('error')
 				exit(0)
-			return
-		except:
-			traceback.print_exc()
- 
+			if codeinfo['isstring'] == '1' and codelen != '1':
+				othermsg = self.getgname(bytecodearg)
+			else:
+				othermsg = ''
+			print("%3s 0x%-16x %-25s 0x%-8x %02x %010s%-25s"%(premsg, pcptr, codeinfo['name'], bytecodearg, bytecode, "", othermsg))
 
-class Disvm(gdb.Command):
-	def __init__(self):
-		super(self.__class__, self).__init__("disvm", gdb.COMMAND_USER)
+			pcptr += int(codelen)
+
+
+			if bytecode == 153:
+				break
+			if idx > 200:
+				print("too many cycle")
+				break
+			if idx > aCount:
+				break
+			idx += 1
+
+
 	def invoke(self, args, from_tty):
 		try:
 			argv = gdb.string_to_argv(args)
-			if len(argv) == 0:
-				gdb.execute("dis activation.regs_.pc 10")
-			elif len(argv) == 1:
-				if int(argv[0]) < 0:
-					gdb.execute("dis activation.regs_.pc%s 10"%argv[0])
+
+			pcptrres = gdb.execute("p activation.regs_.pc", to_string = True)
+			pcptr = int(GetClassAndAddr(pcptrres)[1], 16)
+			count = 10
+			if len(argv) > 0:
+				if len(argv) == 1:
+					if int(argv[0]) < 0:
+						pcptrres = gdb.execute("p activation.regs_.pc%s"%(argv[0]), to_string = True)
+						pcptr = int(GetClassAndAddr(pcptrres)[1], 16)
+					else:
+						count = int(argv[0])
 				else:
-					gdb.execute("dis activation.regs_.pc %s"%argv[0])
-			else:
-				gdb.execute("dis activation.regs_.pc%s %s"%(argv[0], argv[1]))
+					count = int(argv[1])
+					print(count)
+					pcptrres = gdb.execute("p activation.regs_.pc%s"%(argv[0]), to_string = True)
+					pcptr = int(GetClassAndAddr(pcptrres)[1], 16)
+			self.realdisvm(pcptr, count)
 		except:
                         traceback.print_exc()                       
-Pasciistr()
-Pbytecode()
-Disvm()
+Pasciistr("pasciistr")
+Disvm("disvm")
